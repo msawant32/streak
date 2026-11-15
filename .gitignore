@@ -1,0 +1,16 @@
+node_modules
+dist
+*.local
+.DS_Store
+# Android signing: never commit these
+*.jks
+*.keystore
+keystore.properties
+# The shared test key is the one exception: it must be committed
+!android/app/debug.keystore
+android/app/release
+android/.gradle
+android/build
+android/app/build
+android/local.properties
+*.tar.gz
