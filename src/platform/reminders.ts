@@ -49,6 +49,7 @@ async function nativeInit(handlers: ReminderActionHandlers) {
             channelId: CHANNEL_ID,
             actionTypeId: ACTION_TYPE,
             extra: event.notification.extra,
+            isExactNotification: false,
             schedule: { at: new Date(Date.now() + 60 * 60 * 1000), allowWhileIdle: true },
           },
         ],
@@ -79,7 +80,10 @@ async function nativeSync(plan: PlannedReminder[]) {
       actionTypeId: ACTION_TYPE,
       group: 'streak-reminders',
       extra: { activityId: p.activityId, date: p.date },
-      // Inexact but delivered in Doze. Avoids the restricted exact-alarm permission.
+      // Inexact but still delivered in battery-saving mode. This must be stated explicitly: the plugin
+      // defaults to exact alarms and would otherwise send the user to Android's "Alarms & reminders"
+      // settings screen, a permission this app deliberately does not declare.
+      isExactNotification: false,
       schedule: { at: p.at, allowWhileIdle: true },
     })),
   });

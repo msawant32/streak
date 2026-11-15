@@ -99,7 +99,7 @@ export function SettingsPage() {
 
           <Button variant="danger" className="w-full" onClick={() => setResetStep(1)}>Erase all data</Button>
         </div>
-        <p className="pt-3 text-sm text-muted">Streak 1.3.0. No account, no ads, no tracking.</p>
+        <p className="pt-3 text-sm text-muted">Streak 1.3.1. No account, no ads, no tracking.</p>
       </div>
 
       {pendingImport !== null && (
