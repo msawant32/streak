@@ -1,12 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useNames } from '../app/privacy';
+import { repo } from '../data/repo';
+import { BrandMark, Chevron, Eye } from './icons';
 
 /* ---------- Buttons ---------- */
 
 type Variant = 'primary' | 'quiet' | 'danger';
 const variants: Record<Variant, string> = {
   primary: 'bg-accent text-on-accent',
-  quiet: 'bg-sunk text-ink',
+  quiet: 'bg-accent-soft text-accent',
   danger: 'bg-transparent text-danger',
 };
 
@@ -15,32 +18,57 @@ export function Button({ variant = 'primary', className = '', ...rest }: ButtonH
     <button
       type="button"
       {...rest}
-      className={`min-h-12 rounded-full px-5 font-semibold transition-transform active:scale-[0.97] disabled:opacity-50 ${variants[variant]} ${className}`}
+      className={`min-h-12 rounded-2xl px-5 font-semibold transition-transform active:scale-[0.97] disabled:opacity-50 ${variants[variant]} ${className}`}
     />
   );
 }
 
 /* ---------- Page chrome ---------- */
 
-export function PageHeader({ title, sub, back, action }: { title: string; sub?: string; back?: boolean; action?: ReactNode }) {
+/** Eye button that hides or shows activity names on every screen. */
+export function HideNamesButton() {
+  const { hidden } = useNames();
+  return (
+    <button
+      type="button"
+      aria-pressed={hidden}
+      aria-label={hidden ? 'Show activity names' : 'Hide activity names'}
+      title={hidden ? 'Show names' : 'Hide names'}
+      onClick={() => void repo.saveSettings({ hideNames: !hidden })}
+      className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${hidden ? 'bg-accent text-on-accent' : 'bg-surface text-ink shadow-[var(--shadow)] ring-1 ring-line'}`}
+    >
+      <Eye off={hidden} />
+    </button>
+  );
+}
+
+/**
+ * Top of every screen: either the brand (main tabs) or a Back button, then the title.
+ * The hide-names button is always in the top-right corner.
+ */
+export function PageHeader({ title, sub, back, action, brand }: { title?: string; sub?: string; back?: boolean; action?: ReactNode; brand?: boolean }) {
   const navigate = useNavigate();
   return (
-    <header className="flex items-start justify-between gap-3 px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
-      <div className="min-w-0">
-        {back && (
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="-ml-2 flex min-h-12 items-center gap-1 rounded-full px-2 font-semibold text-accent"
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            Back
+    <header className="px-5 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <div className="flex min-h-12 items-center justify-between gap-2">
+        {back ? (
+          <button type="button" onClick={() => navigate(-1)} className="-ml-2 flex min-h-11 items-center gap-0.5 rounded-full px-2 font-semibold text-accent">
+            <Chevron /> Back
           </button>
+        ) : brand ? (
+          <span className="flex items-center gap-2 font-bold tracking-tight">
+            <BrandMark size={26} /> streak
+          </span>
+        ) : (
+          <span />
         )}
-        <h1 className="text-title font-bold">{title}</h1>
-        {sub && <p className="mt-1 text-muted">{sub}</p>}
+        <span className="flex items-center gap-1">
+          {action}
+          <HideNamesButton />
+        </span>
       </div>
-      {action}
+      {title && <h1 className="mt-2 truncate text-title font-bold">{title}</h1>}
+      {sub && <p className="mt-0.5 text-muted">{sub}</p>}
     </header>
   );
 }
@@ -101,7 +129,7 @@ export function Dialog({ title, children, onClose }: { title: string; children: 
       ref={ref}
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
-      className="m-auto w-[min(92vw,24rem)] rounded-2xl bg-surface p-6 text-ink backdrop:bg-black/50"
+      className="m-auto w-[min(92vw,24rem)] rounded-3xl bg-surface p-6 text-ink shadow-xl backdrop:bg-black/40 backdrop:backdrop-blur-[2px]"
     >
       <h2 className="font-bold">{title}</h2>
       <div className="mt-2">{children}</div>

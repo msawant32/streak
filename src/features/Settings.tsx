@@ -1,26 +1,50 @@
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
+import { BACKUP_EVERY_DAYS, backupNow, eraseAll, KEEP_ERASED_DAYS, restoreErased } from '../app/backups';
 import { useData } from '../app/data';
 import { Button, Dialog, PageHeader, Segmented, useToast } from '../components/ui';
+import { db } from '../data/db';
 import { repo } from '../data/repo';
-import { downloadFile } from '../platform/native';
+import { formatDateTime } from '../domain/dates';
 import { isNative, reminderPermission, requestReminderPermission, type PermissionState } from '../platform/reminders';
 
+const ROW = 'flex min-h-14 items-center justify-between gap-3 py-1.5';
+
+function TimeRow({ id, label, value, onChange }: { id: string; label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className={ROW}>
+      <label htmlFor={id} className="font-semibold">{label}</label>
+      <input id={id} type="time" className="field !min-h-11 !w-[7.25rem] !px-2" value={value} onChange={(e) => e.target.value && onChange(e.target.value)} />
+    </div>
+  );
+}
+
 export function SettingsPage() {
-  const { settings, today } = useData();
+  const { settings } = useData();
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
+  const backup = useLiveQuery(() => db.meta.get('autoBackup'), []);
+  const erased = useLiveQuery(() => db.meta.get('erased'), []);
   const [permission, setPermission] = useState<PermissionState>('prompt');
-  const [resetStep, setResetStep] = useState<0 | 1 | 2>(0);
+  const [eraseStep, setEraseStep] = useState<0 | 1 | 2>(0);
   const [pendingImport, setPendingImport] = useState<string | null>(null);
+  const [confirmRestore, setConfirmRestore] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     void reminderPermission().then(setPermission);
   }, []);
 
-  async function exportData() {
-    const backup = await repo.exportBackup();
-    downloadFile(`streak-backup-${today}.json`, JSON.stringify(backup, null, 2), 'application/json');
-    toast({ message: 'Backup saved' });
+  async function runBackup() {
+    setBusy(true);
+    try {
+      const row = await backupNow({ download: true });
+      toast({ message: `Backed up to ${row.where}` });
+    } catch {
+      toast({ message: 'Could not save the backup. Try again.' });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function runImport(text: string) {
@@ -35,22 +59,17 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" />
+      <PageHeader brand title="Settings" />
 
       <div className="px-5">
         <div className="card divide-y divide-line px-4">
-          <div className="flex min-h-16 items-center justify-between gap-3 py-2">
-            <label htmlFor="default-time" className="font-semibold">Reminder time</label>
-            <input
-              id="default-time"
-              type="time"
-              className="field !w-36"
-              value={settings.defaultReminderTime}
-              onChange={(e) => e.target.value && void repo.saveSettings({ defaultReminderTime: e.target.value })}
-            />
+          <div className="py-1">
+            <TimeRow id="default-1" label="Reminder 1" value={settings.defaultReminderTime} onChange={(v) => void repo.saveSettings({ defaultReminderTime: v })} />
+            <TimeRow id="default-2" label="Reminder 2" value={settings.defaultSecondReminderTime ?? '20:00'} onChange={(v) => void repo.saveSettings({ defaultSecondReminderTime: v })} />
+            <p className="pb-1 text-sm text-muted">Used for new activities.</p>
           </div>
 
-          <div className="flex min-h-16 items-center justify-between gap-3 py-2">
+          <div className={ROW}>
             <div>
               <p className="font-semibold">Notifications</p>
               <p className="text-sm text-muted">
@@ -63,7 +82,7 @@ export function SettingsPage() {
             {permission === 'prompt' && <Button onClick={() => void requestReminderPermission().then(setPermission)}>Allow</Button>}
           </div>
 
-          <div className="py-3">
+          <div className="py-2.5">
             <Segmented
               label="Theme"
               value={settings.theme}
@@ -76,11 +95,15 @@ export function SettingsPage() {
             />
           </div>
 
-          <div className="py-3">
-            <p className="font-semibold">Backup</p>
-            <p className="text-sm text-muted">Your data is stored only on this device.</p>
+          <div className="py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-semibold">Backup</p>
+              <p className="text-sm text-muted">Every {BACKUP_EVERY_DAYS} days</p>
+            </div>
+            <p className="text-sm text-muted">{backup ? `Last: ${formatDateTime(backup.at)}` : 'No backup yet'}</p>
+            {backup && <p className="break-all text-sm text-muted">{backup.where}</p>}
             <div className="mt-2 flex gap-2">
-              <Button variant="quiet" className="flex-1" onClick={() => void exportData()}>Save</Button>
+              <Button variant="quiet" className="flex-1" disabled={busy} onClick={() => void runBackup()}>Back up now</Button>
               <Button variant="quiet" className="flex-1" onClick={() => fileRef.current?.click()}>Import</Button>
             </div>
             <input
@@ -97,9 +120,20 @@ export function SettingsPage() {
             />
           </div>
 
-          <Button variant="danger" className="w-full" onClick={() => setResetStep(1)}>Erase all data</Button>
+          {erased?.expiresAt && (
+            <div className="flex items-center justify-between gap-3 py-2.5">
+              <div className="min-w-0">
+                <p className="font-semibold">Erased data</p>
+                <p className="text-sm text-muted">Kept until {formatDateTime(erased.expiresAt)}</p>
+                <p className="break-all text-sm text-muted">{erased.where}</p>
+              </div>
+              <Button variant="quiet" onClick={() => setConfirmRestore(true)}>Restore</Button>
+            </div>
+          )}
+
+          <Button variant="danger" className="w-full" onClick={() => setEraseStep(1)}>Erase all data</Button>
         </div>
-        <p className="pt-3 text-sm text-muted">Streak 1.3.1. No account, no ads, no tracking.</p>
+        <p className="pt-2 text-sm text-muted">Streak 1.5.0. No account, no ads, no tracking.</p>
       </div>
 
       {pendingImport !== null && (
@@ -111,25 +145,44 @@ export function SettingsPage() {
           </div>
         </Dialog>
       )}
-      {resetStep > 0 && (
-        <Dialog key={resetStep} title={resetStep === 1 ? 'Erase all data?' : 'Are you sure?'} onClose={() => setResetStep(0)}>
+
+      {confirmRestore && (
+        <Dialog title="Restore erased data?" onClose={() => setConfirmRestore(false)}>
+          <p className="text-muted">This replaces what is in Streak now with the data erased on {erased ? formatDateTime(erased.at) : ''}.</p>
+          <div className="mt-5 flex flex-col gap-2">
+            <Button
+              onClick={() => {
+                setConfirmRestore(false);
+                void restoreErased().then(() => toast({ message: 'Erased data restored' }));
+              }}
+            >
+              Restore
+            </Button>
+            <Button variant="quiet" onClick={() => setConfirmRestore(false)}>Cancel</Button>
+          </div>
+        </Dialog>
+      )}
+
+      {eraseStep > 0 && (
+        <Dialog key={eraseStep} title={eraseStep === 1 ? 'Erase all data?' : 'Are you sure?'} onClose={() => setEraseStep(0)}>
           <p className="text-muted">
-            {resetStep === 1
-              ? 'This deletes every activity, check-in and setting on this device.'
-              : 'This cannot be undone. Without a backup, your streaks are gone for good.'}
+            {eraseStep === 1
+              ? `All activities, history and settings are removed. A copy is kept for ${KEEP_ERASED_DAYS} days so you can restore it, then it is deleted.`
+              : 'Please confirm once more. Your activities disappear from the app now.'}
           </p>
           <div className="mt-5 flex flex-col gap-2">
             <Button
-              variant="danger"
+              className={eraseStep === 2 ? '!bg-danger !text-surface' : ''}
+              variant={eraseStep === 1 ? 'danger' : 'primary'}
               onClick={() => {
-                if (resetStep === 1) return setResetStep(2);
-                setResetStep(0);
-                void repo.resetAll();
+                if (eraseStep === 1) return setEraseStep(2);
+                setEraseStep(0);
+                void eraseAll();
               }}
             >
-              {resetStep === 1 ? 'Continue' : 'Erase all data'}
+              {eraseStep === 1 ? 'Continue' : 'Yes, erase all data'}
             </Button>
-            <Button variant="quiet" onClick={() => setResetStep(0)}>Keep my data</Button>
+            <Button variant="quiet" onClick={() => setEraseStep(0)}>Keep my data</Button>
           </div>
         </Dialog>
       )}

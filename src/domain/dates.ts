@@ -45,6 +45,11 @@ export function formatTime(time: string, locale?: string): string {
   return atTime('2024-01-01', time).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
 }
 
+/** "Thu, Nov 19, 1:05 AM" */
+export function formatDateTime(iso: string, locale?: string): string {
+  return new Date(iso).toLocaleString(locale, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
 export function formatDate(s: ISODate, opts: Intl.DateTimeFormatOptions, locale?: string): string {
   return fromISO(s).toLocaleDateString(locale, opts);
 }

@@ -42,7 +42,7 @@ describe('dates', () => {
 describe('daily streaks', () => {
   it('counts consecutive completed days', () => {
     const s = computeStreak(base, done('2026-01-01', '2026-01-02', '2026-01-03'), '2026-01-03', 1);
-    expect(s).toEqual({ current: 3, longest: 3, unit: 'day' });
+    expect(s).toEqual({ current: 3, longest: 3, previousBest: 0, unit: 'day' });
   });
   it('does not break while today is still open', () => {
     const s = computeStreak(base, done('2026-01-01', '2026-01-02'), '2026-01-03', 1);
@@ -50,7 +50,7 @@ describe('daily streaks', () => {
   });
   it('breaks after a missed day and remembers the longest run', () => {
     const s = computeStreak(base, done('2026-01-01', '2026-01-02', '2026-01-03', '2026-01-05'), '2026-01-05', 1);
-    expect(s).toEqual({ current: 1, longest: 3, unit: 'day' });
+    expect(s).toEqual({ current: 1, longest: 3, previousBest: 3, unit: 'day' });
   });
   it('is zero when yesterday was missed and today is not done', () => {
     expect(computeStreak(base, done('2026-01-01'), '2026-01-03', 1).current).toBe(0);
@@ -75,7 +75,7 @@ describe('weekday streaks', () => {
   });
   it('breaks when a scheduled day is missed', () => {
     const s = computeStreak(a, done('2026-11-02', '2026-11-06'), '2026-11-07', 1);
-    expect(s).toEqual({ current: 1, longest: 1, unit: 'day' });
+    expect(s).toEqual({ current: 1, longest: 1, previousBest: 1, unit: 'day' });
   });
 });
 
@@ -83,7 +83,7 @@ describe('times-per-week streaks', () => {
   const a: Activity = { ...base, startDate: '2026-10-26', frequency: { type: 'timesPerWeek', count: 2 } };
   it('counts weeks where the goal was met and keeps the current week open', () => {
     const map = done('2026-10-26', '2026-10-28', '2026-11-03', '2026-11-05', '2026-11-09');
-    expect(computeStreak(a, map, '2026-11-10', 1)).toEqual({ current: 2, longest: 2, unit: 'week' });
+    expect(computeStreak(a, map, '2026-11-10', 1)).toEqual({ current: 2, longest: 2, previousBest: 0, unit: 'week' });
   });
   it('breaks on a full week below the goal', () => {
     const map = done('2026-10-26', '2026-10-28', '2026-11-03', '2026-11-09', '2026-11-10');
@@ -167,5 +167,31 @@ describe('pause streak for a day', () => {
   it('is not offered when there was no streak to save, or two days were missed', () => {
     expect(streakPauseOffer(base, done(), '2026-01-05', 0, 10)).toBeNull();
     expect(streakPauseOffer(base, three, '2026-01-06', 0, 10)).toBeNull();
+  });
+});
+
+describe('previous best', () => {
+  it('is 0 while the first streak is still running', () => {
+    expect(computeStreak(base, done('2026-01-01', '2026-01-02'), '2026-01-03', 0).previousBest).toBe(0);
+  });
+  it('is the longest streak that has ended, even if the current one is longer', () => {
+    const map = done('2026-01-01', '2026-01-02', '2026-01-04', '2026-01-06', '2026-01-07', '2026-01-08', '2026-01-09');
+    expect(computeStreak(base, map, '2026-01-09', 0)).toMatchObject({ current: 4, longest: 4, previousBest: 2 });
+  });
+  it('counts a streak that just ended', () => {
+    expect(computeStreak(base, done('2026-01-01', '2026-01-02', '2026-01-03'), '2026-01-05', 0)).toMatchObject({ current: 0, previousBest: 3 });
+  });
+});
+
+describe('two reminders', () => {
+  const now = new Date(2026, 0, 3, 7, 0);
+  it('plans reminder 2 on its own when reminder 1 is off', () => {
+    const a = { ...base, reminder: { enabled: false, time: '08:00', followUpTime: '20:00' } };
+    const plan = planReminders([a], new Map(), now, '2026-01-03', 1, 0);
+    expect(plan.map((p) => [p.kind, p.at.getHours()])).toEqual([['followUp', 20]]);
+  });
+  it('drops both once the activity is done', () => {
+    const a = { ...base, reminder: { enabled: true, time: '08:00', followUpTime: '20:00' } };
+    expect(planReminders([a], new Map([['a1', done('2026-01-03')]]), now, '2026-01-03', 1, 0)).toHaveLength(0);
   });
 });

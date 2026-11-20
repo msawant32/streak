@@ -1,7 +1,7 @@
 import { addDays, todayISO } from '../domain/dates';
 import { DEFAULT_SETTINGS, type Activity, type ActivityStatus, type CheckIn, type ISODate, type Settings } from '../domain/types';
 import { activitySchema, parseBackup, type Backup } from './backup';
-import { db as defaultDb, type StreakDB } from './db';
+import { db as defaultDb, type MetaRow, type StreakDB } from './db';
 
 const now = () => new Date().toISOString();
 const uuid = () => crypto.randomUUID();
@@ -130,10 +130,27 @@ export function createRepo(db: StreakDB = defaultDb) {
       return { activities: backup.activities.length, checkIns: backup.checkIns.length };
     },
 
+    /** Removes all activities, history and settings. Backups and erased copies (the meta table) are kept. */
     async resetAll(): Promise<void> {
       await db.transaction('rw', db.activities, db.checkIns, db.settings, async () => {
         await Promise.all([db.activities.clear(), db.checkIns.clear(), db.settings.clear()]);
       });
+    },
+
+    async hasActivities(): Promise<boolean> {
+      return (await db.activities.count()) > 0;
+    },
+
+    getMeta(key: MetaRow['key']): Promise<MetaRow | undefined> {
+      return db.meta.get(key);
+    },
+
+    async putMeta(row: MetaRow): Promise<void> {
+      await db.meta.put(row);
+    },
+
+    async deleteMeta(key: MetaRow['key']): Promise<void> {
+      await db.meta.delete(key);
     },
   };
 }

@@ -1,7 +1,9 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useData } from '../app/data';
-import { Button, Dialog, PageHeader, Segmented, Switch, useToast } from '../components/ui';
+import { ReminderRow } from '../components/ReminderRow';
+import { useNames } from '../app/privacy';
+import { Button, Dialog, PageHeader, Segmented, useToast } from '../components/ui';
 import { repo, type ActivityInput } from '../data/repo';
 import { COLORS, ICONS, type Frequency } from '../domain/types';
 import { reminderPermission, requestReminderPermission } from '../platform/reminders';
@@ -33,8 +35,9 @@ export function ActivityForm() {
   const [count, setCount] = useState(existing?.frequency.type === 'timesPerWeek' ? existing.frequency.count : 3);
   const [remind, setRemind] = useState(existing?.reminder.enabled ?? true);
   const [time, setTime] = useState(existing?.reminder.time ?? settings.defaultReminderTime);
-  const [followUp, setFollowUp] = useState(Boolean(existing?.reminder.followUpTime));
-  const [followUpTime, setFollowUpTime] = useState(existing?.reminder.followUpTime ?? '20:00');
+  // New activities get both reminders, 8 AM and 8 PM by default (changeable in Settings).
+  const [followUp, setFollowUp] = useState(existing ? Boolean(existing.reminder.followUpTime) : true);
+  const [followUpTime, setFollowUpTime] = useState(existing?.reminder.followUpTime ?? settings.defaultSecondReminderTime ?? '20:00');
   const [startDate, setStartDate] = useState(existing?.startDate ?? today);
   // Colour and icon are no longer chosen in the app; the stored values are kept for compatibility.
   const color = existing?.color ?? COLORS[0];
@@ -45,6 +48,7 @@ export function ActivityForm() {
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const toast = useToast();
+  const { hidden, show } = useNames();
 
   useEffect(() => {
     if (id && !existing) navigate('/', { replace: true });
@@ -57,9 +61,8 @@ export function ActivityForm() {
     const trimmed = name.trim();
     if (!trimmed) e.name = 'Give the activity a name.';
     if (freqType === 'weekdays' && days.length === 0) e.days = 'Choose at least one day.';
-    if (remind && followUp && followUpTime <= time) e.followUp = 'Set the second reminder later than the first.';
     setErrors(e);
-    if (e.days || e.followUp) setMore(true);
+    if (e.days) setMore(true);
     if (Object.keys(e).length) return null;
     const frequency: Frequency =
       freqType === 'daily' ? { type: 'daily' } : freqType === 'weekdays' ? { type: 'weekdays', days: [...days].sort() } : { type: 'timesPerWeek', count };
@@ -70,7 +73,7 @@ export function ActivityForm() {
       targetQuantity: existing?.targetQuantity,
       unit: existing?.unit,
       frequency,
-      reminder: { enabled: remind, time, followUpTime: remind && followUp ? followUpTime : undefined },
+      reminder: { enabled: remind, time, followUpTime: followUp ? followUpTime : undefined },
       startDate,
       category: existing?.category,
       color,
@@ -98,7 +101,7 @@ export function ActivityForm() {
       return;
     }
     // Ask for notification permission in context: only when a reminder is actually being turned on.
-    if (input.reminder.enabled && (await reminderPermission()) === 'prompt') {
+    if ((input.reminder.enabled || input.reminder.followUpTime) && (await reminderPermission()) === 'prompt') {
       setAskPermission(true);
       return;
     }
@@ -117,7 +120,7 @@ export function ActivityForm() {
       <PageHeader title={existing ? 'Edit activity' : 'New activity'} back />
       <div className="flex flex-col gap-4 px-5">
         <Field label="Name" error={errors.name}>
-          <input className="field" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Read a book" autoFocus={!existing} aria-invalid={Boolean(errors.name)} />
+          <input className={`field ${hidden ? 'masked' : ''}`} autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Read a book" autoFocus={!existing} aria-invalid={Boolean(errors.name)} />
         </Field>
 
         <div>
@@ -129,10 +132,10 @@ export function ActivityForm() {
           )}
         </div>
 
-        <div className="flex min-h-12 items-center gap-3">
-          <label htmlFor="reminder-time" className="flex-1 font-semibold">Reminder</label>
-          {remind && <input id="reminder-time" type="time" className="field !w-36" value={time} onChange={(e) => e.target.value && setTime(e.target.value)} />}
-          <Switch checked={remind} onChange={setRemind} label="Reminder" />
+        <div>
+          <ReminderRow id="reminder-1" label="Reminder 1" on={remind} time={time} onToggle={setRemind} onTime={setTime} />
+          <ReminderRow id="reminder-2" label="Reminder 2" on={followUp} time={followUpTime} onToggle={setFollowUp} onTime={setFollowUpTime} />
+          <p className="text-sm text-muted">Sent only if the activity is still not done.</p>
         </div>
 
         <button type="button" aria-expanded={more} onClick={() => setMore(!more)} className="-my-2 min-h-12 self-start text-sm font-semibold text-accent">
@@ -182,17 +185,6 @@ export function ActivityForm() {
               )}
             </fieldset>
 
-            {remind && (
-              <div>
-                <div className="flex min-h-12 items-center gap-3">
-                  <label htmlFor="follow-up-time" className="flex-1 font-semibold">Second reminder</label>
-                  {followUp && <input id="follow-up-time" type="time" className="field !w-36" value={followUpTime} onChange={(e) => e.target.value && setFollowUpTime(e.target.value)} />}
-                  <Switch checked={followUp} onChange={setFollowUp} label="Second reminder" />
-                </div>
-                {errors.followUp && <p className="mt-1 text-sm font-semibold text-danger" role="alert">{errors.followUp}</p>}
-              </div>
-            )}
-
             <div className="flex min-h-12 items-center gap-3">
               <label htmlFor="start-date" className="flex-1 font-semibold">Start date</label>
               <input id="start-date" type="date" className="field !w-44" value={startDate} onChange={(e) => e.target.value && setStartDate(e.target.value)} />
@@ -222,7 +214,7 @@ export function ActivityForm() {
       </div>
 
       {confirmDelete && existing && (
-        <Dialog title={`Delete ${existing.name}?`} onClose={() => setConfirmDelete(false)}>
+        <Dialog title={`Delete ${show(existing.name)}?`} onClose={() => setConfirmDelete(false)}>
           <p className="text-muted">This removes the activity and its history from this device. It cannot be undone.</p>
           <div className="mt-5 flex flex-col gap-2">
             <Button

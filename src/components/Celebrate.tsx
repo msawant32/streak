@@ -13,7 +13,7 @@ export const useCelebrate = () => useContext(Ctx);
 
 // Soft tones from the app palette only. Twelve small pieces, animated with CSS transforms:
 // no library, no canvas, and nothing left in the page once it ends.
-const TONES = ['var(--accent)', 'color-mix(in srgb, var(--accent) 45%, var(--surface))', 'var(--muted)'];
+const TONES = ['var(--accent)', 'var(--ember)', 'color-mix(in srgb, var(--accent) 40%, var(--surface))'];
 const PIECES = Array.from({ length: 12 }, (_, i) => {
   const angle = (i / 12) * Math.PI * 2;
   const distance = 46 + (i % 3) * 16;

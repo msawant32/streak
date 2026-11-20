@@ -47,6 +47,8 @@ export function dayStatus(a: Activity, map: CheckInMap, date: ISODate, today: IS
 export interface StreakResult {
   current: number;
   longest: number;
+  /** Longest streak that has already ended, or 0 if no streak has ended yet. */
+  previousBest: number;
   unit: 'day' | 'week';
 }
 
@@ -59,6 +61,11 @@ export interface StreakResult {
 export function computeStreak(a: Activity, map: CheckInMap, today: ISODate, weekStartsOn: 0 | 1): StreakResult {
   let run = 0;
   let longest = 0;
+  let previousBest = 0;
+  const breakRun = () => {
+    previousBest = Math.max(previousBest, run);
+    run = 0;
+  };
 
   if (a.frequency.type === 'timesPerWeek') {
     const goal = a.frequency.count;
@@ -73,9 +80,9 @@ export function computeStreak(a: Activity, map: CheckInMap, today: ISODate, week
       // Weeks that were not fully available (started mid-week or paused) cannot break a streak.
       let fullyAvailable = true;
       for (let i = 0; i < 7; i++) if (!isScheduled(a, addDays(w, i))) fullyAvailable = false;
-      if (fullyAvailable) run = 0;
+      if (fullyAvailable) breakRun();
     }
-    return { current: run, longest, unit: 'week' };
+    return { current: run, longest, previousBest, unit: 'week' };
   }
 
   for (let d = a.startDate; d <= today; d = addDays(d, 1)) {
@@ -83,10 +90,10 @@ export function computeStreak(a: Activity, map: CheckInMap, today: ISODate, week
       run++;
       longest = Math.max(longest, run);
     } else if (isScheduled(a, d) && d !== today) {
-      run = 0;
+      breakRun();
     }
   }
-  return { current: run, longest, unit: 'day' };
+  return { current: run, longest, previousBest, unit: 'day' };
 }
 
 /** Share of scheduled days completed over the last `days` days (0–1), or null if nothing was scheduled. */
@@ -197,7 +204,7 @@ export function planReminders(
   const out: PlannedReminder[] = [];
   const empty: CheckInMap = new Map();
   for (const a of activities) {
-    if (a.status !== 'active' || !a.reminder.enabled) continue;
+    if (a.status !== 'active' || (!a.reminder.enabled && !a.reminder.followUpTime)) continue;
     const map = maps.get(a.id) ?? empty;
     const streak = computeStreak(a, map, today, weekStartsOn);
     for (let i = 0; i < daysAhead; i++) {
@@ -205,7 +212,7 @@ export function planReminders(
       const due = i === 0 ? needsAction(a, map, date, weekStartsOn) : isScheduled(a, date);
       if (!due) continue;
       const times: [PlannedReminder['kind'], string | undefined][] = [
-        ['main', a.reminder.time],
+        ['main', a.reminder.enabled ? a.reminder.time : undefined],
         ['followUp', a.reminder.followUpTime],
       ];
       for (const [kind, time] of times) {

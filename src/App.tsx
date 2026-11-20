@@ -1,6 +1,8 @@
 import { Component, useEffect, type ReactNode } from 'react';
 import { HashRouter, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { runHousekeeping } from './app/backups';
 import { DataProvider, useData } from './app/data';
+import { maskName } from './app/privacy';
 import { BottomNav } from './components/BottomNav';
 import { CelebrateProvider } from './components/Celebrate';
 import { ToastProvider } from './components/ui';
@@ -40,6 +42,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
 /** Applies the theme and keeps scheduled reminders in step with the data. */
 function Effects() {
   const { activities, maps, settings, today } = useData();
+  const hidden = settings.hideNames === true;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -47,12 +50,20 @@ function Effects() {
     const apply = () => {
       const dark = settings.theme === 'dark' || (settings.theme === 'system' && media.matches);
       document.documentElement.classList.toggle('dark', dark);
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#1c2222' : '#f5f6f4');
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#101716' : '#f3f5f4');
     };
     apply();
     media.addEventListener('change', apply);
     return () => media.removeEventListener('change', apply);
   }, [settings.theme]);
+
+  // Automatic backup every 2 days, and removal of erased data after 2 days.
+  useEffect(() => {
+    void runHousekeeping();
+    const onVisible = () => document.visibilityState === 'visible' && void runHousekeeping();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
 
   useEffect(() => {
     initNativeNavigation(navigate);
@@ -64,12 +75,16 @@ function Effects() {
   }, []);
 
   useEffect(() => {
-    const sync = () => void syncReminders(planReminders(activities, maps, new Date(), today, 7, settings.weekStartsOn));
+    const sync = () => {
+      const plan = planReminders(activities, maps, new Date(), today, 7, settings.weekStartsOn);
+      // With names hidden, notifications on the lock screen show only the first letter too.
+      void syncReminders(hidden ? plan.map((p) => ({ ...p, title: maskName(p.title) })) : plan);
+    };
     sync();
     const onVisible = () => document.visibilityState === 'visible' && sync();
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [activities, maps, settings.weekStartsOn, today]);
+  }, [activities, maps, settings.weekStartsOn, today, hidden]);
 
   return null;
 }

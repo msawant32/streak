@@ -13,3 +13,7 @@ createRoot(document.getElementById('root')!).render(
 if ('serviceWorker' in navigator && import.meta.env.PROD && location.protocol.startsWith('http') && location.hostname !== 'localhost') {
   void navigator.serviceWorker.register('./sw.js');
 }
+
+// Ask the browser not to clear Streak's storage under disk pressure. (Inside the Android app the data
+// lives in the app's own storage and is kept across updates.)
+void navigator.storage?.persist?.().catch(() => {});

@@ -50,7 +50,7 @@ export function Heatmap({ activity, map, today, weekStartsOn }: { activity: Acti
           return (
             <span
               key={date}
-              className="grid h-8 place-items-center rounded-lg text-sm font-semibold"
+              className="grid h-[1.875rem] place-items-center rounded-lg text-sm font-semibold"
               style={cellStyle(s, 'var(--accent)')}
               aria-label={`${formatDate(date, { month: 'long', day: 'numeric' })}${NAMES[s] ? `: ${NAMES[s]}` : ''}`}
             >

@@ -41,10 +41,12 @@ export const checkInSchema = z.object({
 
 export const settingsSchema = z.object({
   defaultReminderTime: time,
+  defaultSecondReminderTime: time.optional(),
   theme: z.enum(['system', 'light', 'dark']),
   weekStartsOn: z.union([z.literal(0), z.literal(1)]),
   allowBackfillYesterday: z.boolean(),
   onboardingComplete: z.boolean(),
+  hideNames: z.boolean().optional(),
   schemaVersion: z.number().int(),
 });
 

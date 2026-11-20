@@ -7,6 +7,9 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+def appVersion = new groovy.json.JsonSlurper().parse(rootProject.file('../package.json')).version
+def appVersionCode = appVersion.tokenize('.').collect { it.toInteger() }.with { it[0] * 10000 + it[1] * 100 + it[2] }
+
 android {
     namespace = "com.yourname.streak"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -14,8 +17,10 @@ android {
         applicationId "com.yourname.streak"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Taken from package.json: 1.5.0 -> versionName "1.5.0", versionCode 10500.
+        // A higher version code on every release makes Android treat the new APK as an update, which keeps the data.
+        versionCode appVersionCode
+        versionName appVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

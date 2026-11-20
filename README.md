@@ -31,8 +31,11 @@ This opens **http://localhost:5173** in your browser. Changes to the code show u
 - **No scrolling**: every screen fits a 360×740 phone. Today and Progress scroll only when the list of activities is long.
 - **Pause streak for a day**: appears on an activity only when its last scheduled day was missed, or after 9 PM when today is still not done. It excuses that one day so the streak carries on. Limited to 2 per activity per calendar month, and not shown anywhere else.
 - **Progress**: done today, streaks running, best streak, and every activity with its streak.
-- **Reminders** at 8:00 AM by default, sent only while the activity is still not done.
-- **Backup**: save and import a JSON backup, erase everything.
+- **Two reminders a day**, 8:00 AM and 8:00 PM by default, each with its own on/off switch. Defaults for new activities are in Settings. A reminder is sent only while the activity is still not done.
+- **Automatic backup every 2 days**, replacing the previous one. On Android it goes to `Documents/Streak/streak-backup.json` (visible in the Files app); Settings shows the time and location of the last one. "Back up now" and "Import" are in Settings.
+- **Erase all data** asks twice. A copy is kept for 2 days at `Documents/Streak/streak-erased.json` and can be restored from Settings or from the welcome screen; after 2 days it is deleted. Erasing also removes the automatic backup.
+- **Hide names**: the eye button at the top of every screen shows only the first letter of each activity name ("R••••"), including in notifications. Tap it again to show names.
+- **Previous best**: the activity page shows the longest streak that has ended, once there is one.
 - **Private by design**: no account, no server, no tracking. Data stays on the device.
 
 ## Design rules

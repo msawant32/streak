@@ -40,7 +40,7 @@ Both run automatically every time the code on GitHub changes, and both run the t
 3. Get `Streak.apk` onto the phone. Easiest: sign in to GitHub in the phone's browser and download it there, then unzip it in the Files app. Or send the file to yourself.
 4. Tap `Streak.apk`. Android asks once to allow installing from that app (browser or Files); allow it, then tap **Install**.
 
-Later builds install over the old one and keep your data, because every build is signed with the same test key (`android/app/debug.keystore`). That key is for testing only. A Play Store release uses your own private key; see [ANDROID_BUILD.md](ANDROID_BUILD.md).
+**Install new versions over the old app; do not uninstall it first.** Uninstalling deletes the app's data. Later builds install over the old one and keep your data, because every build is signed with the same test key (`android/app/debug.keystore`). That key is for testing only. A Play Store release uses your own private key; see [ANDROID_BUILD.md](ANDROID_BUILD.md).
 
 ## Open the web preview
 
@@ -60,3 +60,7 @@ Open the failed run in the **Actions** tab, click the step with the red cross, a
 ## Free limits
 
 Public repositories build for free without a minute limit. Private repositories on the free plan get a monthly allowance of build minutes; check GitHub's pricing page for the current numbers.
+
+## If you ever need to reinstall
+
+Streak saves a backup to `Documents/Streak/streak-backup.json` every 2 days (Settings > Back up now saves one immediately). After a fresh install, the welcome screen has **Restore from a backup file**: pick that file and everything comes back.

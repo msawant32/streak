@@ -7,10 +7,11 @@ export type Frequency =
   | { type: 'timesPerWeek'; count: number };
 
 export interface Reminder {
+  /** Whether reminder 1 is on. */
   enabled: boolean;
-  /** "HH:mm", device local time */
+  /** Reminder 1, "HH:mm", device local time */
   time: string;
-  /** Optional second nudge later in the day, "HH:mm" */
+  /** Reminder 2, "HH:mm". Absent when reminder 2 is off. */
   followUpTime?: string;
 }
 
@@ -49,15 +50,20 @@ export interface CheckIn {
 
 export interface Settings {
   defaultReminderTime: string;
+  /** Reminder 2 for new activities. Optional so older backups still import. */
+  defaultSecondReminderTime?: string;
   theme: 'system' | 'light' | 'dark';
   weekStartsOn: 0 | 1;
   allowBackfillYesterday: boolean;
   onboardingComplete: boolean;
+  /** Privacy: show only the first letter of activity names everywhere, including notifications. */
+  hideNames?: boolean;
   schemaVersion: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   defaultReminderTime: '08:00',
+  defaultSecondReminderTime: '20:00',
   theme: 'system',
   weekStartsOn: 0,
   allowBackfillYesterday: true,
